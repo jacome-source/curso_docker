@@ -1,0 +1,41 @@
+version: '3'
+
+#Serviços Configurados
+services:
+  # Baixa a base de dados
+  # db referenciado no app
+  # Esse serviço é acessado pelo app com o nome db
+  # Tem que ter necessáriamente esse nome pru app conectar 
+  db: 
+    image: mongo:3.4
+  # Serviço referente a aplicação
+  # Baixa o framework da linguagem
+  # Necessário configurar volumes para que o container tenha acesso ao app
+  # Necessário mapeas as portas utilizadas pelo app
+  # Ao final, deve executar um comando para startar o app  
+  backend:
+    image: node:8.1
+    # A esqerda é o diretório do host
+    # Está utilizando '.', um path relativo que depende do diretório que o terminal se encontra quando o comando for executado
+    # A direita é o dietório no container, em geral, ele é criado
+    # Necessário compartilhar o volume pra o container ver o arquivo do app
+    volumes: 
+      - ./backend:/backend
+    # Faz o mapeamento das portas, como um servidor DNS
+    # esquerda é a porta do host, direita do container
+    ports:
+      - 3000:3000
+    # Comando para executar o app
+    # Lembrando que todo container em seu nível mais baixo é um kernell
+    # Move o terminal para o diretório backend
+    # Instala as dependências do app com "npm -i"
+    # Executa o app
+    command: bash -c "cd ./backend && npm i && node app"  
+  frontend:    
+    image: nginx:1.13
+    # O nginx utiliza o diretório /usr/share/nginx/html/ para identificar seus arquivos htmls
+    # Necessário mapear com o diretório do nginx nosso diretório com htmls
+    volumes:
+      - ./frontend:/usr/share/nginx/html/
+    ports:
+      - 80:80 
