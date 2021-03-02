@@ -1,0 +1,87 @@
+version: '3'
+# Dados é uma pasta que será criada na inicialização do container
+volumes:
+  dados:
+# Configuração das redes
+# Os containers devem ter o máximo de isolamento possível
+networks:
+  banco:
+  web:
+  fila:     
+services:
+  db:
+    image: postgres:9.6 
+    environment:
+      # Necessário para mapeamento do banco
+      POSTGRES_DB: "db"
+      POSTGRES_HOST_AUTH_METHOD: "trust"
+    volumes: 
+      # Volume dos dados
+      # A esquerda, máquina host, a direita a do container
+      - dados:/var/lib/postgres/
+      # Scripts
+      # A esquerda, máquina host, a direita a do container
+      - ./scripts:/scripts
+      # Define um script inicial (entrypoint) para ser executado ao iniacializar o container
+      # A diretiva docker-entrypoint-initdb.d é definida na documentação oficial do postgress no docker hub
+      - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - banco 
+    # Comando para orquestrar a inicialização dos serviços
+    # Se frontend for inicializado só, ele irá inicializar o serviço app   
+  frontend:
+    image: nginx:1.13
+    volumes:
+      # Site
+      - ./web:/usr/share/nginx/html/
+      # Configuração do proxy reverso
+      # Faz o mapeamento de arquivos (além dos de diretório)
+      # Aponta o arquivo da pasta nginx do host para o arquivo do servidor no container
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
+    ports: 
+      - 80:80
+    networks:
+      - web 
+    depends_on:
+      - app  
+  app:
+    image: python:3.6
+    restart: always
+    volumes:
+      - ./app:/app
+    working_dir: /app
+    command: bash ./app.sh
+    # Com o proxy reverso, não é necessário a porta
+    # ports:
+    #  - 8080:8080
+    networks:
+      - banco
+      - web
+      - fila
+    depends_on: 
+      db:
+        condition: service_started
+      queue:
+        condition: service_started
+    # Setando variáveis de ambiente
+    # DB_NAME foi criado no app.py - é possível criar variáveis independentemente    
+    environment:
+      - DB_NAME=mail_sender     
+  queue:
+    image: redis:3.2
+    networks: 
+      - fila
+  # Ao invés de utilizar imagem pronta, está utilizando build personalizado do worker    
+  worker:
+    build: worker
+    volumes:
+    # Worker
+      - ./worker:/worker
+    working_dir: /worker
+    command: worker.py
+    networks: 
+      - fila
+    depends_on: 
+      - queue    
+
+
